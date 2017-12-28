@@ -1,8 +1,8 @@
 {
-  "name": "metalsmith-assets-improved",
-  "version": "1.0.0",
-  "description": "Include static assets in a Metalsmith build",
-  "main": "index.js",
+  "name": "metalsmith-assets-copy",
+  "version": "0.0.1",
+  "description": "Copies static assets in a Metalsmith build",
+  "main": "lib/index.js",
   "engines": {
     "node": ">=6.9.2"
   },
@@ -11,24 +11,45 @@
     "url": "https://github.com/philgs/metalsmith-assets-improved.git"
   },
   "author": {
-    "name": "Phil Gates-Shannon",
-    "email": "phil.gs@gmail.com",
+    "name": "Jun Matsushita",
+    "email": "jun@iilab.org",
     "url": "http://philgs.me"
   },
+  "contributors": [
+    {
+      "name": "Phil Gates-Shannon",
+      "email": "phil.gs@gmail.com",
+      "url": "http://philgs.me"
+    }
+  ],
   "scripts": {
-    "test": "mocha --reporter spec"
+    "build": "babel --source-maps --ignore test src -d lib",
+    "build:watch": "nodemon --watch src --exec npm run build",
+    "pretest": "npm -s run build",
+    "test": "mocha --reporter spec",
+    "postversion": "git push --follow-tags",
+    "prepublishOnly": "npm -s run build"
   },
   "license": "BSD-3-Clause",
   "dependencies": {
+    "copy-dir": "^0.3.0",
     "debug": "^2.2.0",
     "fs-extra": "^2.0.0",
-    "lodash": "^4.17.4"
+    "lodash": "^4.17.4",
+    "moment": "^2.17.1",
+    "multimatch": "^2.1.0"
   },
   "devDependencies": {
+    "babel-cli": "^6.24.1",
+    "babel-eslint": "^7.2.3",
+    "babel-plugin-transform-object-rest-spread": "^6.23.0",
+    "babel-preset-env": "^1.5.1",
     "chai": "^3.5.0",
     "chai-moment-js": "^1.0.0",
     "dirty-chai": "^1.2.2",
+    "eslint": "^3.19.0",
+    "eslint-config-prettier": "^2.1.1",
     "metalsmith": "^2.3.0",
-    "moment": "^2.17.1"
+    "nodemon": "^1.13.3"
   }
 }

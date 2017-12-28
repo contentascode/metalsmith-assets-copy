@@ -1,4 +1,6 @@
-# Assets Improved
+# Assets Copy
+
+This is a fork of `metalsmith-assets-improved` which for now keeps the same api but adds `overwrite` and `dereference` as options of the underlying copy.
 
 **Assets Improved** is [Metalsmith][1] plugin for handling static assets, such as images and CSS files. It is a replacement for plugins such as ["Metalsmith Assets"][2] and ["Metalsmith Static"][3], although it has an API different from those plugins.
 

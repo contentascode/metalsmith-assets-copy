@@ -1,215 +1,208 @@
-let assets = require( '../index' );
-let fs = require( 'fs-extra' );
-let Metalsmith = require( 'metalsmith' );
-let path = require( 'path' );
+const assets = require('../src/index');
+const fs = require('fs-extra');
+const Metalsmith = require('metalsmith');
+const path = require('path');
 
-let metalsmithReplacer = require( '../lib/utilities/metalsmithReplacer' );
-let saveMetadata = require( '../lib/utilities/saveMetadata' );
+const metalsmithReplacer = require('./utilities/metalsmithReplacer');
+const saveMetadata = require('./utilities/saveMetadata');
 
-let files = require( './lib/file-helpers' );
-let fn = require( './lib/test-functions' );
+const files = require('./lib/file-helpers');
+const fn = require('./lib/test-functions');
 
-describe( 'metalsmith-assets-improved', function() {
-    const fixtureRoot = path.resolve( __dirname, 'fixtures' );
+describe('metalsmith-assets-improved', function() {
+  const fixtureRoot = path.resolve(__dirname, 'fixtures');
 
-    before( function() {
-        files.purgeBuildDirs( fixtureRoot );
-    } );
+  before(function() {
+    files.purgeBuildDirs(fixtureRoot);
+  });
 
-    after( function() {
-        files.purgeTempFiles();
-    } );
+  after(function() {
+    files.purgeTempFiles();
+  });
 
-    context( '(when given a configuration object)', function() {
+  context('(when given a configuration object)', function() {
+    it('copies files from the default source directory to the default destination directory', function(done) {
+      const fixturePath = path.resolve(fixtureRoot, 'basic');
+      const metalsmith = Metalsmith(fixturePath);
+      metalsmith.use(assets()).build(function(err) {
+        if (err) return done(err);
 
-        it( 'copies files from the default source directory to the default destination directory', function( done ) {
-            let fixturePath = path.resolve( fixtureRoot, 'basic' );
-            let metalsmith = Metalsmith( fixturePath );
-            metalsmith
-                .use( assets() )
-                .build( function( err ) {
-                    if ( err ) return done( err );
+        const expected = fn.getExpected(fixturePath);
+        const actualFiles = files.readFileStats(path.resolve(fixturePath, 'build', '.'));
+        fn.compareFileStats(expected.files, actualFiles);
+        done();
+      });
+    });
 
-                    let expected = fn.getExpected( fixturePath );
-                    let actualFiles = files.readFileStats( path.resolve( fixturePath, 'build', '.' ) );
-                    fn.compareFileStats( expected.files, actualFiles );
-                    done();
-                } );
-        } );
+    it('copies files from a configured source directory to a configured destination directory', function(done) {
+      const fixturePath = path.resolve(fixtureRoot, 'custom');
+      const metalsmith = Metalsmith(fixturePath);
+      const assetOptions = {
+        src: 'static',
+        dest: 'static'
+      };
+      metalsmith.use(assets(assetOptions)).build(function(err) {
+        if (err) return done(err);
 
-        it( 'copies files from a configured source directory to a configured destination directory', function( done ) {
-            let fixturePath = path.resolve( fixtureRoot, 'custom' );
-            let metalsmith = Metalsmith( fixturePath );
-            let assetOptions = {
-                src: 'static',
-                dest: 'static'
-            };
-            metalsmith
-                .use( assets( assetOptions ) )
-                .build( function( err ) {
-                    if ( err ) return done( err );
+        const expected = fn.getExpected(fixturePath, assetOptions);
+        const actualFiles = files.readFileStats(path.resolve(fixturePath, 'build', assetOptions.dest));
+        fn.compareFileStats(expected.files, actualFiles);
+        done();
+      });
+    });
 
-                    let expected = fn.getExpected( fixturePath, assetOptions );
-                    let actualFiles = files.readFileStats( path.resolve( fixturePath, 'build', assetOptions.dest ) );
-                    fn.compareFileStats( expected.files, actualFiles );
-                    done();
-                } );
-        } );
+    it('does not overwrite files when no "replace" option is given', function(done) {
+      const fixturePath = path.resolve(fixtureRoot, 'replace1');
 
-        it( 'does not overwrite files when no "replace" option is given', function( done ) {
-            let fixturePath = path.resolve( fixtureRoot, 'replace1' );
+      // Create a set of duplicate files, one older and one newer
+      files.createTempFilePair(fixturePath, null, true);
+      files.createTempFilePair(fixturePath, null, false);
 
-            // Create a set of duplicate files, one older and one newer
-            files.createTempFilePair( fixturePath, null, true );
-            files.createTempFilePair( fixturePath, null, false );
+      const metalsmith = Metalsmith(fixturePath);
+      metalsmith
+        .clean(false)
+        .use(assets())
+        .build(function(err) {
+          if (err) return done(err);
 
-            let metalsmith = Metalsmith( fixturePath );
-            metalsmith
-                .clean( false )
-                .use( assets() )
-                .build( function( err ) {
-                    if ( err ) return done( err );
+          const expected = fn.getExpected(fixturePath);
+          const actualFiles = files.readFileStats(path.resolve(fixturePath, 'build', '.'));
+          fn.compareFileStats(expected.files, actualFiles);
 
-                    let expected = fn.getExpected( fixturePath );
-                    let actualFiles = files.readFileStats( path.resolve( fixturePath, 'build', '.' ) );
-                    fn.compareFileStats( expected.files, actualFiles );
+          done();
+        });
+    });
 
-                    done();
-                } );
-        } );
+    it('does not overwrite files when the "replace" option is set to "none"', function(done) {
+      const fixturePath = path.resolve(fixtureRoot, 'replace2');
 
-        it( 'does not overwrite files when the "replace" option is set to "none"', function( done ) {
-            let fixturePath = path.resolve( fixtureRoot, 'replace2' );
+      // Create a set of duplicate files, one older and one newer
+      files.createTempFilePair(fixturePath, null, true);
+      files.createTempFilePair(fixturePath, null, false);
 
-            // Create a set of duplicate files, one older and one newer
-            files.createTempFilePair( fixturePath, null, true );
-            files.createTempFilePair( fixturePath, null, false );
+      const metalsmith = Metalsmith(fixturePath);
+      const assetOptions = {
+        replace: 'none'
+      };
+      metalsmith
+        .clean(false)
+        .use(assets(assetOptions))
+        .build(function(err) {
+          if (err) return done(err);
 
-            let metalsmith = Metalsmith( fixturePath );
-            let assetOptions = {
-                replace: 'none'
-            };
-            metalsmith
-                .clean( false )
-                .use( assets( assetOptions ) )
-                .build( function( err ) {
-                    if ( err ) return done( err );
+          const expected = fn.getExpected(fixturePath);
+          const actualFiles = files.readFileStats(path.resolve(fixturePath, 'build', '.'));
+          fn.compareFileStats(expected.files, actualFiles, assetOptions.replace);
 
-                    let expected = fn.getExpected( fixturePath );
-                    let actualFiles = files.readFileStats( path.resolve( fixturePath, 'build', '.' ) );
-                    fn.compareFileStats( expected.files, actualFiles, assetOptions.replace );
+          done();
+        });
+    });
 
-                    done();
-                } );
-        } );
+    it('overwrites files when the "replace" option is set to "all"', function(done) {
+      const fixturePath = path.resolve(fixtureRoot, 'replace3');
 
-        it( 'overwrites files when the "replace" option is set to "all"', function( done ) {
-            let fixturePath = path.resolve( fixtureRoot, 'replace3' );
+      // Create a set of duplicate files, one older and one newer
+      files.createTempFilePair(fixturePath, null, true);
+      files.createTempFilePair(fixturePath, null, false);
 
-            // Create a set of duplicate files, one older and one newer
-            files.createTempFilePair( fixturePath, null, true );
-            files.createTempFilePair( fixturePath, null, false );
+      const metalsmith = Metalsmith(fixturePath);
+      const assetOptions = {
+        replace: 'all'
+      };
+      metalsmith
+        .clean(false)
+        .use(assets(assetOptions))
+        .build(function(err) {
+          if (err) return done(err);
 
-            let metalsmith = Metalsmith( fixturePath );
-            let assetOptions = {
-                replace: 'all'
-            };
-            metalsmith
-                .clean( false )
-                .use( assets( assetOptions ) )
-                .build( function( err ) {
-                    if ( err ) return done( err );
+          const expected = fn.getExpected(fixturePath);
+          const actualFiles = files.readFileStats(path.resolve(fixturePath, 'build', '.'));
+          fn.compareFileStats(expected.files, actualFiles, assetOptions.replace);
 
-                    let expected = fn.getExpected( fixturePath );
-                    let actualFiles = files.readFileStats( path.resolve( fixturePath, 'build', '.' ) );
-                    fn.compareFileStats( expected.files, actualFiles, assetOptions.replace );
+          done();
+        });
+    });
 
-                    done();
-                } );
-        } );
+    it('only overwrites older files when the "replace" option is set to "old"', function(done) {
+      const fixturePath = path.resolve(fixtureRoot, 'replace4');
 
-        it( 'only overwrites older files when the "replace" option is set to "old"', function( done ) {
-            let fixturePath = path.resolve( fixtureRoot, 'replace4' );
+      // Create a set of duplicate files, one older and one newer
+      files.createTempFilePair(fixturePath, null, true);
+      files.createTempFilePair(fixturePath, null, false);
 
-            // Create a set of duplicate files, one older and one newer
-            files.createTempFilePair( fixturePath, null, true );
-            files.createTempFilePair( fixturePath, null, false );
+      const metalsmith = Metalsmith(fixturePath);
+      const assetOptions = {
+        replace: 'old'
+      };
+      metalsmith
+        .clean(false)
+        .use(assets(assetOptions))
+        .build(function(err) {
+          if (err) return done(err);
 
-            let metalsmith = Metalsmith( fixturePath );
-            let assetOptions = {
-                replace: 'old'
-            };
-            metalsmith
-                .clean( false )
-                .use( assets( assetOptions ) )
-                .build( function( err ) {
-                    if ( err ) return done( err );
+          const expected = fn.getExpected(fixturePath);
+          const actualFiles = files.readFileStats(path.resolve(fixturePath, 'build', '.'));
+          fn.compareFileStats(expected.files, actualFiles, assetOptions.replace);
 
-                    let expected = fn.getExpected( fixturePath );
-                    let actualFiles = files.readFileStats( path.resolve( fixturePath, 'build', '.' ) );
-                    fn.compareFileStats( expected.files, actualFiles, assetOptions.replace );
+          done();
+        });
+    });
 
-                    done();
-                } );
-        } );
+    it('overwrites files in a custom directory when the "replace" option is set to "all"', function(done) {
+      const fixturePath = path.resolve(fixtureRoot, 'replace5');
+      const metalsmith = Metalsmith(fixturePath);
+      const assetOptions = {
+        src: 'static',
+        dest: 'static',
+        replace: 'all'
+      };
 
-        it( 'overwrites files in a custom directory when the "replace" option is set to "all"', function( done ) {
-            let fixturePath = path.resolve( fixtureRoot, 'replace5' );
-            let metalsmith = Metalsmith( fixturePath );
-            let assetOptions = {
-                src: 'static',
-                dest: 'static',
-                replace: 'all'
-            };
+      // Create a set of duplicate files, one older and one newer
+      files.createTempFilePair(fixturePath, assetOptions, true);
+      files.createTempFilePair(fixturePath, assetOptions, false);
 
-            // Create a set of duplicate files, one older and one newer
-            files.createTempFilePair( fixturePath, assetOptions, true );
-            files.createTempFilePair( fixturePath, assetOptions, false );
+      metalsmith
+        .clean(false)
+        .use(assets(assetOptions))
+        .build(function(err) {
+          if (err) return done(err);
 
-            metalsmith
-                .clean( false )
-                .use( assets( assetOptions ) )
-                .build( function( err ) {
-                    if ( err ) return done( err );
+          const expected = fn.getExpected(fixturePath, assetOptions);
+          const actualFiles = files.readFileStats(path.resolve(fixturePath, 'build', assetOptions.dest));
+          fn.compareFileStats(expected.files, actualFiles, assetOptions.replace);
+          done();
+        });
+    });
 
-                    let expected = fn.getExpected( fixturePath, assetOptions );
-                    let actualFiles = files.readFileStats( path.resolve( fixturePath, 'build', assetOptions.dest ) );
-                    fn.compareFileStats( expected.files, actualFiles, assetOptions.replace );
-                    done();
-                } );
-        } );
+    it('only overwrites older files in a custom directory when the "replace" option is set to "old"', function(done) {
+      const fixturePath = path.resolve(fixtureRoot, 'replace6');
+      const metalsmith = Metalsmith(fixturePath);
+      const assetOptions = {
+        src: 'static',
+        dest: 'static',
+        replace: 'old'
+      };
 
-        it( 'only overwrites older files in a custom directory when the "replace" option is set to "old"', function( done ) {
-            let fixturePath = path.resolve( fixtureRoot, 'replace6' );
-            let metalsmith = Metalsmith( fixturePath );
-            let assetOptions = {
-                src: 'static',
-                dest: 'static',
-                replace: 'old'
-            };
+      // Create a set of duplicate files, one older and one newer
+      files.createTempFilePair(fixturePath, assetOptions, true);
+      files.createTempFilePair(fixturePath, assetOptions, false);
 
-            // Create a set of duplicate files, one older and one newer
-            files.createTempFilePair( fixturePath, assetOptions, true );
-            files.createTempFilePair( fixturePath, assetOptions, false );
+      metalsmith
+        .clean(false)
+        .use(assets(assetOptions))
+        .build(function(err) {
+          if (err) return done(err);
 
-            metalsmith
-                .clean( false )
-                .use( assets( assetOptions ) )
-                .build( function( err ) {
-                    if ( err ) return done( err );
+          const expected = fn.getExpected(fixturePath, assetOptions);
+          const actualFiles = files.readFileStats(path.resolve(fixturePath, 'build', assetOptions.dest));
+          fn.compareFileStats(expected.files, actualFiles, assetOptions.replace);
+          done();
+        });
+    });
+  });
 
-                    let expected = fn.getExpected( fixturePath, assetOptions );
-                    let actualFiles = files.readFileStats( path.resolve( fixturePath, 'build', assetOptions.dest ) );
-                    fn.compareFileStats( expected.files, actualFiles, assetOptions.replace );
-                    done();
-                } );
-        } );
-
-    } );
-
-    context( '(when given an array of configuration objects)', function() {
-        it( 'copies files from all configured source directories to all configured destination directories' );
-        it( 'correctly observes the "replace" option of each config object' );
-    } );
-
-} );
+  context('(when given an array of configuration objects)', function() {
+    it('copies files from all configured source directories to all configured destination directories');
+    it('correctly observes the "replace" option of each config object');
+  });
+});

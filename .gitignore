@@ -1,2 +1,4 @@
 test/**/build
 test/fixtures/*/*.json
+lib
+node_modules
