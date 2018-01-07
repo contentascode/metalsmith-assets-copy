@@ -1,6 +1,6 @@
 {
   "name": "metalsmith-assets-copy",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Copies static assets in a Metalsmith build",
   "main": "lib/index.js",
   "engines": {
