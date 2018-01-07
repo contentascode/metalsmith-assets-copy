@@ -3,40 +3,28 @@ const fs = require('fs-extra');
 const copydir = require('copy-dir');
 const moment = require('moment');
 const path = require('path');
-const _ = require('lodash');
 const match = require('multimatch');
 
-const getFilter = function(replace, src, dest, except) {
+const getFilter = function(replace, except, srcPath) {
+  debug('filter', { replace, except, srcPath });
   return replace === 'all'
-    ? function() {
-        // To overwrite everything, return `true` always
-        return true;
+    ? src => {
+        // debug('path.relative(srcPath, src)', path.relative(srcPath, src));
+        return match(path.relative(srcPath, src), except).length === 0;
       }
     : replace === 'old'
-      ? function(srcFile) {
-          const destFile = resolveDestFile(srcFile, dest);
-          if (fs.existsSync(destFile)) {
-            const srcStat = fs.statSync(srcFile);
-            const destStat = fs.statSync(destFile);
+      ? (src, dest) => {
+          // const destFile = resolveDestFile(srcFile, dest);
+          if (fs.existsSync(dest)) {
+            const srcStat = fs.statSync(src);
+            const destStat = fs.statSync(dest);
             const srcTime = moment(srcStat.mtime);
             const destTime = moment(destStat.mtime);
             return destTime.isBefore(srcTime);
           }
-          return true;
+          return match(path.relative(src, srcPath), except).length === 0;
         }
-      : function(srcFile) {
-          const destFile = resolveDestFile(srcFile, dest);
-          //noinspection RedundantIfStatementJS
-          if (fs.existsSync(destFile)) {
-            return false;
-          }
-          return true;
-        };
-};
-
-const resolveDestFile = function(file, dest) {
-  const base = path.basename(file);
-  return path.resolve(dest, base);
+      : (src, dest) => (fs.existsSync(dest) ? false : match(path.relative(src, srcPath), except).length === 0);
 };
 
 /**
@@ -66,11 +54,11 @@ const resolveDestFile = function(file, dest) {
 const plugin = function metalsmith_assets_copy(options) {
   // Make sure there is an `options` object with a `replace` property
 
-  const { replace, overwrite = true, dereference = false, except = [] } = options;
+  const { replace, overwrite = true, dereference = true, except = [] } = options;
 
   return function(files, metalsmith, done) {
     // Set the next function to run once we are done
-    setImmediate(done);
+    // setImmediate(done);
 
     // Default paths, relative to Metalsmith working directory
     const defaults = {
@@ -79,43 +67,33 @@ const plugin = function metalsmith_assets_copy(options) {
     };
 
     // Merge options and resolve src/dest paths
-    const config = _.merge({}, defaults, options);
+    const config = Object.assign(defaults, options);
     config.src = metalsmith.path(config.src);
     config.dest = metalsmith.path(metalsmith.destination(), config.dest);
 
-    if (replace === 'dir') {
-      copydir.sync(
-        config.src,
-        config.dest,
-        function(stat, filepath, filename) {
-          // To overwrite everything, return `true` always
-          // debug('filepath', filepath);
-          // debug('path.relative', path.relative(config.src, filepath));
-          // debug('match(filepath, except)', match(path.relative(config.src, filepath), except));
-          //
-          return match(path.relative(config.src, filepath), except).length === 0;
-        },
-        function(err) {
-          if (err) {
-            console.error(err);
-            process.exit(1);
-          }
-          console.log('ok');
-        }
-      );
-    } else {
-      // Set options for `fs-extra` copy operation--options set to default are marked
-      const copyOptions = {
-        overwrite, // default
-        errorOnExist: false, // default
-        dereference, // default
-        preserveTimestamps: true,
-        filter: getFilter(replace, config.src, config.dest)
-      };
+    debug('config.src', config.src);
+    debug('config.dest', config.dest);
 
-      // Make it so!
-      fs.copySync(config.src, config.dest, copyOptions);
-    }
+    // src <String>
+    // dest <String> Note that if src is a file, dest cannot be a directory (see issue #323).
+    // options <Object>
+    //  - overwrite <boolean>: overwrite existing file or directory, default is true. Note that the copy operation will silently fail if you set this to false and the destination exists. Use the errorOnExist option to change this behavior.
+    //  - errorOnExist <boolean>: when overwrite is false and the destination exists, throw an error. Default is false.
+    //  - dereference <boolean>: dereference symlinks, default is false.
+    //  - preserveTimestamps <boolean>: will set last modification and access times to the ones of the original source files, default is false.
+    //  - filter <Function>: Function to filter copied files. Return true to include, false to exclude. Can also return a Promise that resolves to true or false (or pass in an async function).
+
+    // Make it so!
+    // Set options for `fs-extra` copy operation--options set to default are marked
+    const copyOptions = {
+      overwrite: replace === 'all', // default
+      errorOnExist: false, // default
+      dereference, // default
+      preserveTimestamps: false,
+      filter: getFilter(replace, except, config.src)
+    };
+
+    fs.copy(config.src, config.dest, copyOptions, done);
   };
 };
 
