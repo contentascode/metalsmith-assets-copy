@@ -36,7 +36,7 @@
     "debug": "^2.2.0",
     "fs-extra": "^2.0.0",
     "moment": "^2.17.1",
-    "multimatch": "^2.1.0"
+    "multimatch": "^7.0.0"
   },
   "devDependencies": {
     "babel-cli": "^6.24.1",
